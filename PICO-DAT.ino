@@ -27,9 +27,10 @@ uint8_t const T3_PIN = 13;
 uint8_t const S1_PIN = 14;
 uint8_t const S2_PIN = 15;
 uint8_t const S3_PIN = 16;
-uint8_t const LED_Y_PIN = 17;
+uint8_t const S4_PIN = 17;
 uint8_t const LED_R_PIN = 18;
 uint8_t const LED_B_PIN = 19;
+uint8_t const LED_Y_PIN = 20;
 
 unsigned long count = 0;
 double distance = 0;
@@ -118,6 +119,7 @@ void setup() {
   pinMode(S1_PIN, INPUT_PULLUP);
   pinMode(S2_PIN, INPUT_PULLUP);
   pinMode(S3_PIN, INPUT_PULLUP);
+  pinMode(S4_PIN, INPUT_PULLUP);
   pinMode(IR_PIN, INPUT_PULLUP);
   pinMode(PIN_PHASE_A, INPUT_PULLUP);
   pinMode(PIN_PHASE_B, INPUT_PULLUP);
@@ -173,6 +175,7 @@ boolean valueOf(uint8_t const &pin, boolean status = true) {
 #define S1 valueOf(S1_PIN, false)
 #define S2 valueOf(S2_PIN, false)
 #define S3 valueOf(S3_PIN, false)
+#define S4 valueOf(S4_PIN, false)
 
 template<typename T = boolean>
 boolean hasUpdate(const char *key, T value) {
@@ -216,6 +219,9 @@ boolean isValuesChanged() {
     changed = true;
   }
   if (hasUpdate("s3", S3)) {
+    changed = true;
+  }
+  if (hasUpdate("s4", S4)) {
     changed = true;
   }
   if (hasUpdate("remote", iRValue)) {
