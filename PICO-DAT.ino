@@ -2,9 +2,7 @@
 #include <ArduinoJson.h>
 
 unsigned int ENCODER_SCALE = 1000;
-float SPEED_MIN = 0.05;
 unsigned int DETA_DISTANCE_TIME = 200;
-unsigned int DETA_SPEED_TIME = 500;
 unsigned int DETA_RPM_TIME = 500;
 unsigned int DETA_SEND_TIME = 200;
 
@@ -34,11 +32,10 @@ uint8_t const LED_Y_PIN = 20;
 
 unsigned long count = 0;
 double distance = 0;
-double oldDistance = 0;
 double speed = 0;
 unsigned int rpm = 0;
 int8_t status = 0;
-uint8_t iRValue = 0;
+int8_t iRValue = -1;
 boolean forward = true;
 JsonDocument doc;
 
@@ -66,11 +63,15 @@ void readSerial() {
   if (Serial.available()) {
     String line = Serial.readStringUntil('\n');
     line.trim();
-    if (line.equalsIgnoreCase("r")) {
+    if (line.equalsIgnoreCase("ledoff")) {
+      digitalWrite(LED_B_PIN, 0);
+      digitalWrite(LED_R_PIN, 0);
+      digitalWrite(LED_Y_PIN, 0);
+    } else if (line.equalsIgnoreCase("r")) {
       digitalWrite(LED_B_PIN, 0);
       digitalWrite(LED_R_PIN, 1);
       digitalWrite(LED_Y_PIN, 0);
-    } else if (line.equalsIgnoreCase("b")) {
+    } else if (line.equalsIgnoreCase("b") || line.equalsIgnoreCase("g")) {
       digitalWrite(LED_B_PIN, 1);
       digitalWrite(LED_R_PIN, 0);
       digitalWrite(LED_Y_PIN, 0);
@@ -80,26 +81,22 @@ void readSerial() {
       digitalWrite(LED_Y_PIN, 1);
     } else if (line.equalsIgnoreCase("reset")) {
       distance = 0;
-      oldDistance = 0;
       count = 0;
     } else if (line.equalsIgnoreCase("get")) {
       sendJson();
     } else if (line.charAt(0) == '{' && line.charAt(line.length() - 1) == '}') {
       JsonDocument filter;
       filter["encoder"] = true;
-      filter["speed"] = true;
       filter["distance_udtime"] = true;
-      filter["speed_udtime"] = true;
       filter["rpm_udtime"] = true;
       filter["senddt_udtime"] = true;
       JsonDocument config;
       deserializeJson(config, line, DeserializationOption::Filter(filter));
       updateConfig<uint>(config, ENCODER_SCALE, "encoder", 1);
-      updateConfig<float>(config, SPEED_MIN, "speed", 0.0);
       updateConfig<uint>(config, DETA_DISTANCE_TIME, "distance_udtime", 100);
-      updateConfig<uint>(config, DETA_SPEED_TIME, "speed_udtime", 200);
       updateConfig<uint>(config, DETA_RPM_TIME, "rpm_udtime", 200);
       updateConfig<uint>(config, DETA_SEND_TIME, "senddt_udtime", 200);
+      sendJson();
     }
   }
 }
@@ -250,12 +247,12 @@ void readIrRemote() {
       release = false;
       iRValue = IrReceiver.decodedIRData.command;
     } else {
-      iRValue = 0;
+      iRValue = -1;
     }
     IrReceiver.resume();
   } else {
     release = true;
-    iRValue = 0;
+    iRValue = -1;
   }
 }
 
@@ -274,22 +271,24 @@ boolean isTimeOut(unsigned long &time, const unsigned int &timeOut) {
 }
 
 unsigned long checkDistanceTime = millis();
-unsigned long checkSpeedTime = millis();
 unsigned long checkRPMTime = millis();
 unsigned long sendJsonTime = millis();
 void loop() {
   if (isTimeOut(checkDistanceTime, DETA_DISTANCE_TIME)) {
     double currDistance = count / (double)ENCODER_SCALE;
-    distance += currDistance;
     count = 0;
-  }
-  if (isTimeOut(checkSpeedTime, DETA_SPEED_TIME)) {
-    speed = (distance - oldDistance) * (1000 / DETA_SPEED_TIME);
-    oldDistance = distance;
-    if (speed >= SPEED_MIN) {
-      status = forward ? FORWARD : BACKWARD;
-    } else {
+    speed = currDistance * (1000 / DETA_DISTANCE_TIME);
+    if (currDistance == 0) {
       status = STOP;
+    } else if (forward) {
+      distance += currDistance;
+      status = FORWARD;
+    } else {
+      distance -= currDistance;
+      status = BACKWARD;
+      if (distance < 0) {
+        distance = 0;
+      }
     }
   }
   if (isTimeOut(checkRPMTime, DETA_RPM_TIME)) {
