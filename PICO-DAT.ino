@@ -1,3 +1,4 @@
+
 #include <ArduinoJson.h>
 
 unsigned int ENCODER_SCALE = 1000;
@@ -129,15 +130,17 @@ void setup() {
   Serial.begin(115200);
 }
 
-boolean markPhaseA = false;
 void attachPhaseA() {
-  markPhaseA = PHASE_B;
+  if (PHASE_B) {
+    count += 1;
+    forward = true;
+  }
 }
 
 void attachPhaseB() {
-  if (markPhaseA != PHASE_A) {
-    forward = markPhaseA;
+  if (PHASE_A) {
     count += 1;
+    forward = false;
   }
 }
 
