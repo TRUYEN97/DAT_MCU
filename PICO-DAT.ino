@@ -1,4 +1,3 @@
-#include <IRremote.hpp>
 #include <ArduinoJson.h>
 
 unsigned int ENCODER_SCALE = 1000;
@@ -9,33 +8,33 @@ unsigned int DETA_SEND_TIME = 200;
 int8_t const FORWARD = 1;
 int8_t const BACKWARD = -1;
 int8_t const STOP = 0;
-
 uint8_t const PIN_PHASE_A = 2;
 uint8_t const PIN_PHASE_B = 3;
-uint8_t const PIN_RPM = 4;
-uint8_t const IR_PIN = 5;
-uint8_t const CM_PIN = 6;
-uint8_t const NT_PIN = 7;
-uint8_t const NP_PIN = 8;
-uint8_t const AT_PIN = 9;
+uint8_t const PIN_PHASE_Z = 4;
+uint8_t const PIN_RPM = 5;
+uint8_t const T1_PIN = 6;
+uint8_t const T2_PIN = 7;
+uint8_t const T3_PIN = 8;
+uint8_t const CM_PIN = 9;
 uint8_t const PT_PIN = 10;
-uint8_t const T1_PIN = 11;
-uint8_t const T2_PIN = 12;
-uint8_t const T3_PIN = 13;
-uint8_t const S1_PIN = 14;
-uint8_t const S2_PIN = 15;
-uint8_t const S3_PIN = 16;
-uint8_t const S4_PIN = 17;
-uint8_t const LED_R_PIN = 18;
-uint8_t const LED_B_PIN = 19;
-uint8_t const LED_Y_PIN = 20;
+uint8_t const S5_PIN = 11;
+uint8_t const S4_PIN = 12;
+uint8_t const S3_PIN = 13;
+uint8_t const S2_PIN = 14;
+uint8_t const S1_PIN = 15;
+uint8_t const NT_PIN = 16;
+uint8_t const NP_PIN = 17;
+uint8_t const AT_PIN = 18;
+uint8_t const RELAY_1 = 21;
+uint8_t const RELAY_2 = 22;
+uint8_t const RELAY_3 = 26;
+uint8_t const RELAY_4 = 27;
 
 unsigned long count = 0;
 double distance = 0;
 double speed = 0;
 unsigned int rpm = 0;
 int8_t status = 0;
-int8_t iRValue = -1;
 boolean forward = true;
 JsonDocument doc;
 
@@ -63,22 +62,19 @@ void readSerial() {
   if (Serial.available()) {
     String line = Serial.readStringUntil('\n');
     line.trim();
-    if (line.equalsIgnoreCase("ledoff")) {
-      digitalWrite(LED_B_PIN, 0);
-      digitalWrite(LED_R_PIN, 0);
-      digitalWrite(LED_Y_PIN, 0);
-    } else if (line.equalsIgnoreCase("r")) {
-      digitalWrite(LED_B_PIN, 0);
-      digitalWrite(LED_R_PIN, 1);
-      digitalWrite(LED_Y_PIN, 0);
-    } else if (line.equalsIgnoreCase("b") || line.equalsIgnoreCase("g")) {
-      digitalWrite(LED_B_PIN, 1);
-      digitalWrite(LED_R_PIN, 0);
-      digitalWrite(LED_Y_PIN, 0);
-    } else if (line.equalsIgnoreCase("y")) {
-      digitalWrite(LED_B_PIN, 0);
-      digitalWrite(LED_R_PIN, 0);
-      digitalWrite(LED_Y_PIN, 1);
+    if (line.equalsIgnoreCase("roff")) {
+      digitalWrite(RELAY_2, 0);
+      digitalWrite(RELAY_1, 0);
+      digitalWrite(RELAY_3, 0);
+      digitalWrite(RELAY_4, 0);
+    } else if (line.equalsIgnoreCase("r1")) {
+      digitalWrite(RELAY_1, 1);
+    } else if (line.equalsIgnoreCase("r2")) {
+      digitalWrite(RELAY_2, 1);
+    } else if (line.equalsIgnoreCase("r3")) {
+      digitalWrite(RELAY_3, 1);
+    } else if (line.equalsIgnoreCase("r4")) {
+      digitalWrite(RELAY_4, 1);
     } else if (line.equalsIgnoreCase("reset")) {
       distance = 0;
       count = 0;
@@ -102,9 +98,10 @@ void readSerial() {
 }
 
 void setup() {
-  pinMode(LED_Y_PIN, OUTPUT);
-  pinMode(LED_R_PIN, OUTPUT);
-  pinMode(LED_B_PIN, OUTPUT);
+  pinMode(RELAY_1, OUTPUT);
+  pinMode(RELAY_2, OUTPUT);
+  pinMode(RELAY_3, OUTPUT);
+  pinMode(RELAY_4, OUTPUT);
   pinMode(CM_PIN, INPUT_PULLUP);
   pinMode(NT_PIN, INPUT_PULLUP);
   pinMode(NP_PIN, INPUT_PULLUP);
@@ -117,21 +114,19 @@ void setup() {
   pinMode(S2_PIN, INPUT_PULLUP);
   pinMode(S3_PIN, INPUT_PULLUP);
   pinMode(S4_PIN, INPUT_PULLUP);
-  pinMode(IR_PIN, INPUT_PULLUP);
+  pinMode(S5_PIN, INPUT_PULLUP);
   pinMode(PIN_PHASE_A, INPUT_PULLUP);
   pinMode(PIN_PHASE_B, INPUT_PULLUP);
+  pinMode(PIN_PHASE_Z, INPUT_PULLUP);
   pinMode(PIN_RPM, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PIN_PHASE_A), attachPhaseA, RISING);
   attachInterrupt(digitalPinToInterrupt(PIN_PHASE_B), attachPhaseB, RISING);
   attachInterrupt(digitalPinToInterrupt(PIN_RPM), attachRPM, RISING);
   pinMode(PIN_PHASE_A, INPUT_PULLUP);
   pinMode(PIN_PHASE_B, INPUT_PULLUP);
+  pinMode(PIN_PHASE_Z, INPUT_PULLUP);
   pinMode(PIN_RPM, INPUT_PULLUP);
   Serial.begin(115200);
-#if defined(__AVR_ATmega32U4__) || defined(SERIAL_PORT_USBVIRTUAL) || defined(SERIAL_USB) /*stm32duino*/ || defined(USBCON) /*STM32_stm32*/ || defined(SERIALUSB_PID) || defined(ARDUINO_attiny3217)
-  delay(4000);  // To be able to connect Serial monitor after reset or power up and before first print out. Do not wait for an attached Serial Monitor!
-#endif
-  IrReceiver.begin(IR_PIN, ENABLE_LED_FEEDBACK);
 }
 
 boolean markPhaseA = false;
@@ -173,6 +168,7 @@ boolean valueOf(uint8_t const &pin, boolean status = true) {
 #define S2 valueOf(S2_PIN, false)
 #define S3 valueOf(S3_PIN, false)
 #define S4 valueOf(S4_PIN, false)
+#define S5 valueOf(S5_PIN, false)
 
 template<typename T = boolean>
 boolean hasUpdate(const char *key, T value) {
@@ -221,7 +217,7 @@ boolean isValuesChanged() {
   if (hasUpdate("s4", S4)) {
     changed = true;
   }
-  if (hasUpdate("remote", iRValue)) {
+  if (hasUpdate("s5", S5)) {
     changed = true;
   }
   if (hasUpdate("status", status)) {
@@ -238,22 +234,6 @@ boolean isValuesChanged() {
     changed = true;
   }
   return changed;
-}
-
-boolean release = true;
-void readIrRemote() {
-  if (IrReceiver.decode()) {
-    if (release) {
-      release = false;
-      iRValue = IrReceiver.decodedIRData.command;
-    } else {
-      iRValue = -1;
-    }
-    IrReceiver.resume();
-  } else {
-    release = true;
-    iRValue = -1;
-  }
 }
 
 boolean isTimeOut(unsigned long &time, const unsigned int &timeOut) {
@@ -295,9 +275,8 @@ void loop() {
     rpm = rpmCount * (1000 / DETA_RPM_TIME) * 60;
     rpmCount = 0;
   }
-  if (isValuesChanged() && isTimeOut(checkRPMTime, DETA_SEND_TIME)) {
+  if (isValuesChanged() && isTimeOut(sendJsonTime, DETA_SEND_TIME)) {
     sendJson();
   }
   readSerial();
-  readIrRemote();
 }
