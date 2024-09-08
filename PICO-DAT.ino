@@ -1,7 +1,7 @@
 
 #include <ArduinoJson.h>
 
-unsigned int ENCODER_SCALE = 1000;
+unsigned int ENCODER_SCALE = 100;
 unsigned int DETA_DISTANCE_TIME = 200;
 unsigned int DETA_RPM_TIME = 500;
 unsigned int DETA_SEND_TIME = 200;
@@ -9,38 +9,43 @@ unsigned int DETA_SEND_TIME = 200;
 int8_t const FORWARD = 1;
 int8_t const BACKWARD = -1;
 int8_t const STOP = 0;
-uint8_t const PIN_PHASE_A = 2;
+uint8_t const PIN_RPM = 2;
 uint8_t const PIN_PHASE_B = 3;
-uint8_t const PIN_PHASE_Z = 4;
-uint8_t const PIN_RPM = 5;
-uint8_t const T1_PIN = 6;
-uint8_t const T2_PIN = 7;
-uint8_t const T3_PIN = 8;
-uint8_t const CM_PIN = 9;
-uint8_t const PT_PIN = 10;
-uint8_t const S5_PIN = 11;
-uint8_t const S4_PIN = 12;
-uint8_t const S3_PIN = 13;
-uint8_t const S2_PIN = 14;
-uint8_t const S1_PIN = 15;
-uint8_t const NT_PIN = 16;
-uint8_t const NP_PIN = 17;
-uint8_t const AT_PIN = 18;
-uint8_t const RELAY_1 = 21;
-uint8_t const RELAY_2 = 22;
-uint8_t const RELAY_3 = 26;
-uint8_t const RELAY_4 = 27;
+uint8_t const PIN_PHASE_A = 4;
+uint8_t const S1_PIN = 6;
+uint8_t const S2_PIN = 7;
+uint8_t const S3_PIN = 8;
+uint8_t const S4_PIN = 9;
+uint8_t const T1_PIN = 10;
+uint8_t const T2_PIN = 11;
+uint8_t const T3_PIN = 12;
+uint8_t const RELAY_1 = 13;
+uint8_t const RELAY_2 = 14;
+uint8_t const RELAY_3 = 15;
+uint8_t const CM_PIN = 16;
+uint8_t const PT_PIN = 17;
+uint8_t const NT_PIN = 18;
+uint8_t const NP_PIN = 19;
+uint8_t const AT_PIN = 20;
+uint8_t const ADC_RPM_PIN = 26;
+uint8_t const ADC_TEMP_PIN = 27;
+uint8_t const ADC_VIN_PIN = 28;
 
 unsigned long count = 0;
 double distance = 0;
 double speed = 0;
+double temp = 0;
 unsigned int rpm = 0;
+unsigned int rpmV = 0;
 int8_t status = 0;
 boolean forward = true;
 JsonDocument doc;
 
 #define PHASE_A digitalRead(PIN_PHASE_A)
 #define PHASE_B digitalRead(PIN_PHASE_B)
+#define ADC_RPM analogRead(ADC_RPM_PIN)
+#define ADC_TEMP analogRead(ADC_TEMP_PIN)
+#define ADC_VIN analogRead(ADC_VIN_PIN)
 
 void sendJson() {
   String jsonString;
@@ -67,15 +72,12 @@ void readSerial() {
       digitalWrite(RELAY_2, 0);
       digitalWrite(RELAY_1, 0);
       digitalWrite(RELAY_3, 0);
-      digitalWrite(RELAY_4, 0);
     } else if (line.equalsIgnoreCase("r1")) {
       digitalWrite(RELAY_1, 1);
     } else if (line.equalsIgnoreCase("r2")) {
       digitalWrite(RELAY_2, 1);
     } else if (line.equalsIgnoreCase("r3")) {
       digitalWrite(RELAY_3, 1);
-    } else if (line.equalsIgnoreCase("r4")) {
-      digitalWrite(RELAY_4, 1);
     } else if (line.equalsIgnoreCase("reset")) {
       distance = 0;
       count = 0;
@@ -102,7 +104,6 @@ void setup() {
   pinMode(RELAY_1, OUTPUT);
   pinMode(RELAY_2, OUTPUT);
   pinMode(RELAY_3, OUTPUT);
-  pinMode(RELAY_4, OUTPUT);
   pinMode(CM_PIN, INPUT_PULLUP);
   pinMode(NT_PIN, INPUT_PULLUP);
   pinMode(NP_PIN, INPUT_PULLUP);
@@ -115,17 +116,14 @@ void setup() {
   pinMode(S2_PIN, INPUT_PULLUP);
   pinMode(S3_PIN, INPUT_PULLUP);
   pinMode(S4_PIN, INPUT_PULLUP);
-  pinMode(S5_PIN, INPUT_PULLUP);
   pinMode(PIN_PHASE_A, INPUT_PULLUP);
   pinMode(PIN_PHASE_B, INPUT_PULLUP);
-  pinMode(PIN_PHASE_Z, INPUT_PULLUP);
   pinMode(PIN_RPM, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PIN_PHASE_A), attachPhaseA, RISING);
   attachInterrupt(digitalPinToInterrupt(PIN_PHASE_B), attachPhaseB, RISING);
   attachInterrupt(digitalPinToInterrupt(PIN_RPM), attachRPM, RISING);
   pinMode(PIN_PHASE_A, INPUT_PULLUP);
   pinMode(PIN_PHASE_B, INPUT_PULLUP);
-  pinMode(PIN_PHASE_Z, INPUT_PULLUP);
   pinMode(PIN_RPM, INPUT_PULLUP);
   Serial.begin(115200);
 }
@@ -171,7 +169,6 @@ boolean valueOf(uint8_t const &pin, boolean status = true) {
 #define S2 valueOf(S2_PIN, false)
 #define S3 valueOf(S3_PIN, false)
 #define S4 valueOf(S4_PIN, false)
-#define S5 valueOf(S5_PIN, false)
 
 template<typename T = boolean>
 boolean hasUpdate(const char *key, T value) {
@@ -220,9 +217,6 @@ boolean isValuesChanged() {
   if (hasUpdate("s4", S4)) {
     changed = true;
   }
-  if (hasUpdate("s5", S5)) {
-    changed = true;
-  }
   if (hasUpdate("status", status)) {
     changed = true;
   }
@@ -234,6 +228,12 @@ boolean isValuesChanged() {
     changed = true;
   }
   if (hasUpdate("rpm", rpm)) {
+    changed = true;
+  }
+  if (hasUpdate("rpmV", rpmV)) {
+    changed = true;
+  }
+  if (hasUpdate("temp", temp)) {
     changed = true;
   }
   return changed;
@@ -260,7 +260,8 @@ void loop() {
   if (isTimeOut(checkDistanceTime, DETA_DISTANCE_TIME)) {
     double currDistance = count / (double)ENCODER_SCALE;
     count = 0;
-    speed = currDistance * (1000 / DETA_DISTANCE_TIME);
+    speed = (currDistance / DETA_DISTANCE_TIME) * (1000 / DETA_DISTANCE_TIME); 
+    //DETA_DISTANCE_TIME = 200 ms
     if (currDistance == 0) {
       status = STOP;
     } else if (forward) {
@@ -277,6 +278,8 @@ void loop() {
   if (isTimeOut(checkRPMTime, DETA_RPM_TIME)) {
     rpm = rpmCount * (1000 / DETA_RPM_TIME) * 60;
     rpmCount = 0;
+    temp = ADC_TEMP * 4.88;
+    // rpmV = 
   }
   if (isValuesChanged() && isTimeOut(sendJsonTime, DETA_SEND_TIME)) {
     sendJson();
