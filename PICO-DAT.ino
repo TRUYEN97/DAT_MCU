@@ -5,6 +5,8 @@ unsigned int ENCODER_SCALE = 100;
 unsigned int DETA_DISTANCE_TIME = 200;
 unsigned int DETA_RPM_TIME = 500;
 unsigned int DETA_SEND_TIME = 200;
+unsigned int NT_DELAY_TIME = 1000;
+unsigned int NP_DELAY_TIME = 1000;
 
 int8_t const FORWARD = 1;
 int8_t const BACKWARD = -1;
@@ -47,10 +49,30 @@ JsonDocument doc;
 #define ADC_TEMP analogRead(ADC_TEMP_PIN)
 #define ADC_VIN analogRead(ADC_VIN_PIN)
 
+void sendJson();
+
+template<typename T = uint>
+void updateConfig(const JsonDocument &config, T &field, const char *key, T spec);
+
+void readSerial();
+
+boolean valOfNPT(boolean value, unsigned long &time, const unsigned int &timeOut, boolean status);
+
+template<typename T = boolean>
+boolean hasUpdate(const char *key, T value);
+
+boolean isValuesChanged();
+
+boolean isTimeOut(unsigned long &time, const unsigned int &timeOut, boolean reset);
+
 void sendJson() {
+  digitalWrite(LED_BUILTIN, LOW);
   String jsonString;
   serializeJson(doc, jsonString);
   Serial.println(jsonString);
+  Serial1.println(jsonString);
+  delay(50);
+  digitalWrite(LED_BUILTIN, HIGH);
 }
 
 template<typename T = uint>
@@ -86,6 +108,8 @@ void readSerial() {
     } else if (line.charAt(0) == '{' && line.charAt(line.length() - 1) == '}') {
       JsonDocument filter;
       filter["encoder"] = true;
+      filter["nt_time"] = true;
+      filter["np_time"] = true;
       filter["distance_udtime"] = true;
       filter["rpm_udtime"] = true;
       filter["senddt_udtime"] = true;
@@ -95,12 +119,16 @@ void readSerial() {
       updateConfig<uint>(config, DETA_DISTANCE_TIME, "distance_udtime", 100);
       updateConfig<uint>(config, DETA_RPM_TIME, "rpm_udtime", 200);
       updateConfig<uint>(config, DETA_SEND_TIME, "senddt_udtime", 200);
+      updateConfig<uint>(config, NT_DELAY_TIME, "nt_time", 0);
+      updateConfig<uint>(config, NP_DELAY_TIME, "np_time", 0);
       sendJson();
     }
   }
 }
 
 void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
   pinMode(RELAY_1, OUTPUT);
   pinMode(RELAY_2, OUTPUT);
   pinMode(RELAY_3, OUTPUT);
@@ -126,6 +154,7 @@ void setup() {
   pinMode(PIN_PHASE_B, INPUT_PULLUP);
   pinMode(PIN_RPM, INPUT_PULLUP);
   Serial.begin(115200);
+  Serial1.begin(115200);
 }
 
 void attachPhaseA() {
@@ -157,9 +186,23 @@ boolean valueOf(uint8_t const &pin, boolean status = true) {
   return !status;
 }
 
-#define CM valueOf(CM_PIN, false)
-#define NT valueOf(NT_PIN, false)
-#define NP valueOf(NP_PIN, false)
+boolean valOfNPT(boolean value, unsigned long &time, const unsigned int &timeOut, boolean status = true) {
+  if (value != status) {
+    if (isTimeOut(time, timeOut, false)) {
+      return value;
+    } else {
+      return !value;
+    }
+  } else {
+    time = millis();
+    return value;
+  }
+}
+unsigned long checkNtTime = millis();
+unsigned long checkNpTime = millis();
+#define CM valueOf(CM_PIN)
+#define NT valOfNPT(valueOf(NT_PIN, false), checkNtTime, NT_DELAY_TIME)
+#define NP valOfNPT(valueOf(NP_PIN, false), checkNpTime, NP_DELAY_TIME)
 #define AT valueOf(AT_PIN, false)
 #define PT valueOf(PT_PIN, false)
 #define T1 valueOf(T1_PIN, false)
@@ -239,7 +282,7 @@ boolean isValuesChanged() {
   return changed;
 }
 
-boolean isTimeOut(unsigned long &time, const unsigned int &timeOut) {
+boolean isTimeOut(unsigned long &time, const unsigned int &timeOut, boolean reset = true) {
   unsigned long currentTime = millis();
   boolean rs = false;
   if (currentTime > time) {
@@ -247,7 +290,7 @@ boolean isTimeOut(unsigned long &time, const unsigned int &timeOut) {
   } else {
     rs = time - currentTime >= timeOut;
   }
-  if (rs) {
+  if (rs && reset) {
     time = currentTime;
   }
   return rs;
@@ -260,7 +303,7 @@ void loop() {
   if (isTimeOut(checkDistanceTime, DETA_DISTANCE_TIME)) {
     double currDistance = count / (double)ENCODER_SCALE;
     count = 0;
-    speed = (currDistance / DETA_DISTANCE_TIME) * (1000 / DETA_DISTANCE_TIME); 
+    speed = (currDistance / DETA_DISTANCE_TIME) * (1000 / DETA_DISTANCE_TIME);
     //DETA_DISTANCE_TIME = 200 ms
     if (currDistance == 0) {
       status = STOP;
@@ -277,9 +320,10 @@ void loop() {
   }
   if (isTimeOut(checkRPMTime, DETA_RPM_TIME)) {
     rpm = rpmCount * (1000 / DETA_RPM_TIME) * 60;
+    // Serial.println(rpmCount);
     rpmCount = 0;
-    temp = ADC_TEMP * 4.88;
-    // rpmV = 
+    // temp = ADC_TEMP * 0.08;
+    // rpmV =
   }
   if (isValuesChanged() && isTimeOut(sendJsonTime, DETA_SEND_TIME)) {
     sendJson();
