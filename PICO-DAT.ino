@@ -62,13 +62,11 @@ boolean isValuesChanged();
 
 boolean isTimeOut(unsigned long &time, const unsigned int &timeOut, boolean reset);
 
-void sendJson() {
+void sendJson(Stream &serialPort) {
   digitalWrite(LED_BUILTIN, LOW);
   String jsonString;
   serializeJson(doc, jsonString);
-  Serial.println(jsonString);
-  Serial1.println(jsonString);
-  delay(50);
+  serialPort.println(jsonString);
   digitalWrite(LED_BUILTIN, HIGH);
 }
 
@@ -83,12 +81,12 @@ void updateConfig(const JsonDocument &config, T &field, const char *key, T spec)
   }
 }
 
-void readSerial() {
-  if (Serial.available()) {
-    String line = Serial.readStringUntil('\n');
+void readSerial(Stream &serialPort) {
+  if (serialPort.available()) {
+    String line = serialPort.readStringUntil('\n');
     line.trim();
     if (line.equalsIgnoreCase("isConnect")) {
-      Serial.println("isConnect");
+      serialPort.println("isConnect");
     } else if (line.equalsIgnoreCase("roff")) {
       digitalWrite(RELAY_2, 0);
       digitalWrite(RELAY_1, 0);
@@ -103,7 +101,7 @@ void readSerial() {
       distance = 0;
       count = 0;
     } else if (line.equalsIgnoreCase("get")) {
-      sendJson();
+      sendJson(serialPort);
     } else if (line.charAt(0) == '{' && line.charAt(line.length() - 1) == '}') {
       JsonDocument filter;
       filter["encoder"] = true;
@@ -114,7 +112,7 @@ void readSerial() {
       updateConfig<double>(config, ENCODER_SCALE, "encoder", 1);
       updateConfig<uint>(config, NT_DELAY_TIME, "nt_time", 0);
       updateConfig<uint>(config, NP_DELAY_TIME, "np_time", 0);
-      sendJson();
+      sendJson(serialPort);
     }
   }
 }
@@ -170,12 +168,12 @@ void attachRPM() {
 }
 
 boolean valueOf(uint8_t const &pin, boolean status = false) {
-  if (!(digitalRead(pin) ^ status)) {
-    delay(30);
-    if (!(digitalRead(pin) ^ status)) {
-      return true;
+  if (digitalRead(pin) == status) {
+      delay(25);
+      if (digitalRead(pin) == status) {
+          return true;
+        }
     }
-  }
   return false;
 }
 
@@ -318,7 +316,9 @@ void loop() {
     // rpmV =
   }
   if (isValuesChanged() && isTimeOut(sendJsonTime, 100)) {
-    sendJson();
+    sendJson(Serial);
+    sendJson(Serial1);
   }
-  readSerial();
+  readSerial(Serial);
+  readSerial(Serial1);
 }
