@@ -206,7 +206,7 @@ unsigned long checkNpTime = millis();
 
 template<typename T = boolean>
 boolean hasUpdate(const char *key, T value) {
-  if (doc[key] != value) {
+  if (doc[key].as<T>() != value) {
     doc[key] = value;
     return true;
   }
