@@ -1,4 +1,4 @@
-
+#include <TinyGPS.h>
 #include <ArduinoJson.h>
 
 double ENCODER_SCALE = 6.59;
@@ -10,11 +10,11 @@ int8_t const BACKWARD = -1;
 int8_t const STOP = 0;
 uint8_t const PIN_RPM = 2;
 uint8_t const PIN_PHASE_B = 3;
-uint8_t const PIN_PHASE_A = 4;
+uint8_t const PIN_PHASE_A = 21;
+uint8_t const S3_PIN = 4;
+uint8_t const S4_PIN = 5;
 uint8_t const S1_PIN = 6;
 uint8_t const S2_PIN = 7;
-uint8_t const S3_PIN = 8;
-uint8_t const S4_PIN = 9;
 uint8_t const T1_PIN = 10;
 uint8_t const T2_PIN = 11;
 uint8_t const T3_PIN = 12;
@@ -34,11 +34,15 @@ unsigned long count = 0;
 double distance = 0;
 double speed = 0;
 double temp = 0;
+double latitude = 0;
+double longitude = 0;
 unsigned int rpm = 0;
 unsigned int rpmV = 0;
 int8_t status = 0;
 boolean forward = true;
+
 JsonDocument doc;
+TinyGPS gps;
 
 #define PHASE_A digitalRead(PIN_PHASE_A)
 #define PHASE_B digitalRead(PIN_PHASE_B)
@@ -70,7 +74,26 @@ void sendJson(Stream &serialPort) {
   digitalWrite(LED_BUILTIN, HIGH);
 }
 
-template<typename T = uint>
+bool newData = false;
+void readGPS() {
+
+  while (Serial2.available()) {
+    char c = Serial2.read();
+    if (gps.encode(c)) {
+      newData = true;
+    }
+  }
+  if (newData) {
+    newData = false;
+    float flat, flon;
+    unsigned long age;
+    gps.f_get_position(&flat, &flon, &age);
+    latitude = flat == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flat;
+    longitude = flon == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flon;
+  }
+}
+
+template<typename T>
 void updateConfig(const JsonDocument &config, T &field, const char *key, T spec) {
   if (config[key].isNull()) {
     return;
@@ -145,6 +168,7 @@ void setup() {
   pinMode(PIN_PHASE_B, INPUT_PULLUP);
   pinMode(PIN_RPM, INPUT_PULLUP);
   Serial1.begin(115200);
+  Serial2.begin(9600);
   Serial.begin(115200);
 }
 
@@ -169,11 +193,11 @@ void attachRPM() {
 
 boolean valueOf(uint8_t const &pin, boolean status = false) {
   if (digitalRead(pin) == status) {
-      delay(25);
-      if (digitalRead(pin) == status) {
-          return true;
-        }
+    delay(25);
+    if (digitalRead(pin) == status) {
+      return true;
     }
+  }
   return false;
 }
 
@@ -204,7 +228,7 @@ unsigned long checkNpTime = millis();
 #define S3 valueOf(S3_PIN)
 #define S4 valueOf(S4_PIN)
 
-template<typename T = boolean>
+template<typename T>
 boolean hasUpdate(const char *key, T value) {
   if (doc[key].as<T>() != value) {
     doc[key] = value;
@@ -269,6 +293,12 @@ boolean isValuesChanged() {
   if (hasUpdate("temp", temp)) {
     changed = true;
   }
+  if (hasUpdate("latitude", latitude)) {
+    changed = true;
+  }
+  if (hasUpdate("longitude", longitude)) {
+    changed = true;
+  }
   return changed;
 }
 
@@ -321,4 +351,5 @@ void loop() {
   }
   readSerial(Serial);
   readSerial(Serial1);
+  readGPS();
 }
