@@ -1,7 +1,8 @@
 #include <TinyGPS.h>
 #include <ArduinoJson.h>
 
-double ENCODER_SCALE = 6.59;
+double ENCODER_SCALE = 6.6;
+double RPM_SCALE = 120;
 unsigned int NT_DELAY_TIME = 500;
 unsigned int NP_DELAY_TIME = 500;
 
@@ -10,11 +11,13 @@ int8_t const BACKWARD = -1;
 int8_t const STOP = 0;
 uint8_t const PIN_RPM = 2;
 uint8_t const PIN_PHASE_B = 3;
-uint8_t const PIN_PHASE_A = 21;
-uint8_t const S3_PIN = 4;
-uint8_t const S4_PIN = 5;
+uint8_t const PIN_PHASE_A = 22;
+uint8_t const GPS_TX = 4;
+uint8_t const GPS_RX = 5;
 uint8_t const S1_PIN = 6;
 uint8_t const S2_PIN = 7;
+uint8_t const S3_PIN = 8;
+uint8_t const S4_PIN = 9;
 uint8_t const T1_PIN = 10;
 uint8_t const T2_PIN = 11;
 uint8_t const T3_PIN = 12;
@@ -36,7 +39,7 @@ double speed = 0;
 double temp = 0;
 double latitude = 0;
 double longitude = 0;
-unsigned int rpm = 0;
+double rpm = 0;
 unsigned int rpmV = 0;
 int8_t status = 0;
 boolean forward = true;
@@ -76,7 +79,6 @@ void sendJson(Stream &serialPort) {
 
 bool newData = false;
 void readGPS() {
-
   while (Serial2.available()) {
     char c = Serial2.read();
     if (gps.encode(c)) {
@@ -133,6 +135,7 @@ void readSerial(Stream &serialPort) {
       JsonDocument config;
       deserializeJson(config, line, DeserializationOption::Filter(filter));
       updateConfig<double>(config, ENCODER_SCALE, "encoder", 1);
+      updateConfig<double>(config, RPM_SCALE, "rpm", 1);
       updateConfig<uint>(config, NT_DELAY_TIME, "nt_time", 0);
       updateConfig<uint>(config, NP_DELAY_TIME, "np_time", 0);
       sendJson(serialPort);
@@ -168,6 +171,8 @@ void setup() {
   pinMode(PIN_PHASE_B, INPUT_PULLUP);
   pinMode(PIN_RPM, INPUT_PULLUP);
   Serial1.begin(115200);
+  Serial2.setTX(GPS_TX);
+  Serial2.setRX(GPS_RX);
   Serial2.begin(9600);
   Serial.begin(115200);
 }
@@ -328,24 +333,21 @@ void loop() {
     if (currDistance == 0) {
       status = STOP;
     } else if (forward) {
-      distance += currDistance;
+      distance = currDistance;
       status = FORWARD;
     } else {
-      distance -= currDistance;
+      distance = currDistance * -1;
       status = BACKWARD;
-      if (distance < 0) {
-        distance = 0;
-      }
     }
   }
   if (isTimeOut(checkRPMTime, 500)) {
-    rpm = rpmCount * 120;
+    rpm = rpmCount/RPM_SCALE * 120;
     // Serial.println(rpmCount);
     rpmCount = 0;
     // temp = ADC_TEMP * 0.08;
     // rpmV =
   }
-  if (isValuesChanged() && isTimeOut(sendJsonTime, 100)) {
+  if (isValuesChanged()) {
     sendJson(Serial);
     sendJson(Serial1);
   }
