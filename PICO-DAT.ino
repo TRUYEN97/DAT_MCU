@@ -198,7 +198,7 @@ void attachRPM() {
 
 boolean valueOf(uint8_t const &pin, boolean status = false) {
   if (digitalRead(pin) == status) {
-    delay(25);
+    delay(20);
     if (digitalRead(pin) == status) {
       return true;
     }
