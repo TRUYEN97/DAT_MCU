@@ -2,7 +2,7 @@
 #include <ArduinoJson.h>
 
 double ENCODER_SCALE = 6.6;
-double RPM_SCALE = 120;
+double RPM_SCALE = 60;
 unsigned int NT_DELAY_TIME = 500;
 unsigned int NP_DELAY_TIME = 500;
 
@@ -331,6 +331,7 @@ void loop() {
     double currDistance = x / ENCODER_SCALE;
     speed = x * 7.2 / ENCODER_SCALE;  //
     if (currDistance == 0) {
+      distance = 0;
       status = STOP;
     } else if (forward) {
       distance = currDistance;
@@ -350,6 +351,7 @@ void loop() {
   if (isValuesChanged()) {
     sendJson(Serial);
     sendJson(Serial1);
+    distance = 0;
   }
   readSerial(Serial);
   readSerial(Serial1);
