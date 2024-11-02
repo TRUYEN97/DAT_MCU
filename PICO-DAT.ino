@@ -3,8 +3,8 @@
 
 double ENCODER_SCALE = 6.6;
 double RPM_SCALE = 60;
-unsigned int NT_DELAY_TIME = 500;
-unsigned int NP_DELAY_TIME = 500;
+unsigned int NT_DELAY_TIME = 868;
+unsigned int NP_DELAY_TIME = 868;
 
 int8_t const FORWARD = 1;
 int8_t const BACKWARD = -1;
@@ -59,6 +59,8 @@ template<typename T = uint>
 void updateConfig(const JsonDocument &config, T &field, const char *key, T spec);
 
 void readSerial();
+
+boolean valueOf(uint8_t const &pin, boolean status);
 
 boolean valOfNPT(boolean value, unsigned long &time, const unsigned int &timeOut, boolean status);
 
@@ -116,10 +118,16 @@ void readSerial(Stream &serialPort) {
       digitalWrite(RELAY_2, 0);
       digitalWrite(RELAY_1, 0);
       digitalWrite(RELAY_3, 0);
+    } else if (line.equalsIgnoreCase("r1off")) {
+      digitalWrite(RELAY_1, 0);
     } else if (line.equalsIgnoreCase("r1")) {
       digitalWrite(RELAY_1, 1);
+    } else if (line.equalsIgnoreCase("r2off")) {
+      digitalWrite(RELAY_2, 0);
     } else if (line.equalsIgnoreCase("r2")) {
       digitalWrite(RELAY_2, 1);
+    } else if (line.equalsIgnoreCase("r3off")) {
+      digitalWrite(RELAY_3, 0);
     } else if (line.equalsIgnoreCase("r3")) {
       digitalWrite(RELAY_3, 1);
     } else if (line.equalsIgnoreCase("reset")) {
@@ -142,6 +150,24 @@ void readSerial(Stream &serialPort) {
     }
   }
 }
+
+unsigned long checkNtTime = millis();
+unsigned long checkNpTime = millis();
+unsigned long checkT1Time = millis();
+unsigned long checkT2Time = millis();
+unsigned long checkT3Time = millis();
+#define CM valueOf(CM_PIN)
+#define NT valOfNPT(valueOf(NT_PIN, true), checkNtTime, NT_DELAY_TIME)
+#define NP valOfNPT(valueOf(NP_PIN, true), checkNpTime, NP_DELAY_TIME)
+#define AT valueOf(AT_PIN)
+#define PT valueOf(PT_PIN)
+#define T1 valOfNPT(valueOf(T1_PIN), checkT1Time, 200)
+#define T2 valOfNPT(valueOf(T2_PIN), checkT2Time, 200)
+#define T3 valOfNPT(valueOf(T3_PIN), checkT3Time, 200)
+#define S1 valueOf(S1_PIN)
+#define S2 valueOf(S2_PIN)
+#define S3 valueOf(S3_PIN)
+#define S4 valueOf(S4_PIN)
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -175,6 +201,7 @@ void setup() {
   Serial2.setRX(GPS_RX);
   Serial2.begin(9600);
   Serial.begin(115200);
+  isValuesChanged();
 }
 
 void attachPhaseA() {
@@ -218,20 +245,6 @@ boolean valOfNPT(boolean value, unsigned long &time, const unsigned int &timeOut
     return true;
   }
 }
-unsigned long checkNtTime = millis();
-unsigned long checkNpTime = millis();
-#define CM valueOf(CM_PIN)
-#define NT valOfNPT(valueOf(NT_PIN, true), checkNtTime, NT_DELAY_TIME)
-#define NP valOfNPT(valueOf(NP_PIN, true), checkNpTime, NP_DELAY_TIME)
-#define AT valueOf(AT_PIN)
-#define PT valueOf(PT_PIN)
-#define T1 valueOf(T1_PIN)
-#define T2 valueOf(T2_PIN)
-#define T3 valueOf(T3_PIN)
-#define S1 valueOf(S1_PIN)
-#define S2 valueOf(S2_PIN)
-#define S3 valueOf(S3_PIN)
-#define S4 valueOf(S4_PIN)
 
 template<typename T>
 boolean hasUpdate(const char *key, T value) {
@@ -310,20 +323,19 @@ boolean isValuesChanged() {
 boolean isTimeOut(unsigned long &time, const unsigned int &timeOut, boolean reset = true) {
   unsigned long currentTime = millis();
   boolean rs = false;
-  if (currentTime > time) {
+  if (currentTime >= time) {
     rs = currentTime - time >= timeOut;
   } else {
     rs = time - currentTime >= timeOut;
   }
   if (rs && reset) {
-    time = currentTime;
+    time = millis();
   }
   return rs;
 }
 
 unsigned long checkDistanceTime = millis();
 unsigned long checkRPMTime = millis();
-unsigned long sendJsonTime = millis();
 void loop() {
   if (isTimeOut(checkDistanceTime, 500)) {
     int x = count;
