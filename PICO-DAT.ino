@@ -336,6 +336,7 @@ boolean isTimeOut(unsigned long &time, const unsigned int &timeOut, boolean rese
 
 unsigned long checkDistanceTime = millis();
 unsigned long checkRPMTime = millis();
+unsigned long checkSendTime = millis();
 void loop() {
   if (isTimeOut(checkDistanceTime, 500)) {
     int x = count;
@@ -360,10 +361,11 @@ void loop() {
     // temp = ADC_TEMP * 0.08;
     // rpmV =
   }
-  if (isValuesChanged()) {
+  if (isValuesChanged() || isTimeOut(checkSendTime, 500)) {
     sendJson(Serial);
     sendJson(Serial1);
     distance = 0;
+    checkSendTime = millis();
   }
   readSerial(Serial);
   readSerial(Serial1);
