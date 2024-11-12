@@ -1,7 +1,7 @@
 #include <TinyGPS.h>
 #include <ArduinoJson.h>
 
-double ENCODER_SCALE = 6.6;
+double ENCODER_SCALE = 10.5;
 double RPM_SCALE = 60;
 unsigned int NT_DELAY_TIME = 868;
 unsigned int NP_DELAY_TIME = 868;
