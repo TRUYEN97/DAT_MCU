@@ -157,8 +157,8 @@ unsigned long checkT1Time = millis();
 unsigned long checkT2Time = millis();
 unsigned long checkT3Time = millis();
 #define CM valueOf(CM_PIN)
-#define NT valOfNPT(valueOf(NT_PIN, true), checkNtTime, NT_DELAY_TIME)
-#define NP valOfNPT(valueOf(NP_PIN, true), checkNpTime, NP_DELAY_TIME)
+#define NT valOfNPT(valueOf(NT_PIN), checkNtTime, NT_DELAY_TIME)
+#define NP valOfNPT(valueOf(NP_PIN), checkNpTime, NP_DELAY_TIME)
 #define AT valueOf(AT_PIN)
 #define PT valueOf(PT_PIN)
 #define T1 valOfNPT(valueOf(T1_PIN), checkT1Time, 200)
