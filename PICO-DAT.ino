@@ -3,8 +3,8 @@
 
 double ENCODER_SCALE = 10.5;
 double RPM_SCALE = 60;
-unsigned int NT_DELAY_TIME = 868;
-unsigned int NP_DELAY_TIME = 868;
+unsigned int NT_DELAY_TIME = 666;
+unsigned int NP_DELAY_TIME = 666;
 
 int8_t const FORWARD = 1;
 int8_t const BACKWARD = -1;
@@ -33,7 +33,7 @@ uint8_t const ADC_RPM_PIN = 26;
 uint8_t const ADC_TEMP_PIN = 27;
 uint8_t const ADC_VIN_PIN = 28;
 
-unsigned long count = 0;
+long count = 0;
 double distance = 0;
 double speed = 0;
 double temp = 0;
@@ -42,7 +42,6 @@ double longitude = 0;
 double rpm = 0;
 unsigned int rpmV = 0;
 int8_t status = 0;
-boolean forward = true;
 
 JsonDocument doc;
 TinyGPS gps;
@@ -135,7 +134,8 @@ void readSerial(Stream &serialPort) {
       count = 0;
     } else if (line.equalsIgnoreCase("get")) {
       sendJson(serialPort, doc);
-    }if (line.equalsIgnoreCase("getConfig")) {
+    }
+    if (line.equalsIgnoreCase("getConfig")) {
       JsonDocument cf;
       cf["encoder"] = ENCODER_SCALE;
       cf["nt_time"] = NT_DELAY_TIME;
@@ -221,14 +221,12 @@ void setup() {
 void attachPhaseA() {
   if (PHASE_B) {
     count += 1;
-    forward = true;
   }
 }
 
 void attachPhaseB() {
   if (PHASE_A) {
-    count += 1;
-    forward = false;
+    count -= 1;
   }
 }
 
@@ -353,23 +351,21 @@ unsigned long checkRPMTime = millis();
 unsigned long checkSendTime = millis();
 void loop() {
   if (isTimeOut(checkDistanceTime, 500)) {
-    int x = count;
+    long x = count;
     count = 0;
-    double currDistance = x / ENCODER_SCALE;
-    speed = x * 7.2 / ENCODER_SCALE;  //
-    if (currDistance == 0) {
+    distance = x / ENCODER_SCALE;
+    speed = abs(x) * 7.2 / ENCODER_SCALE;  //
+    if (x == 0) {
       distance = 0;
       status = STOP;
-    } else if (forward) {
-      distance = currDistance;
+    } else if (x > 0) {
       status = FORWARD;
     } else {
-      distance = currDistance * -1;
       status = BACKWARD;
     }
   }
   if (isTimeOut(checkRPMTime, 500)) {
-    rpm = rpmCount/RPM_SCALE * 120;
+    rpm = rpmCount / RPM_SCALE * 120;
     // Serial.println(rpmCount);
     rpmCount = 0;
     // temp = ADC_TEMP * 0.08;
