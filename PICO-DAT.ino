@@ -53,7 +53,7 @@ TinyGPS gps;
 #define ADC_TEMP analogRead(ADC_TEMP_PIN)
 #define ADC_VIN analogRead(ADC_VIN_PIN)
 
-void sendJson();
+void sendJson(Stream &serialPort, JsonDocument &json);
 
 template<typename T = uint>
 void updateConfig(const JsonDocument &config, T &field, const char *key, T spec);
@@ -71,10 +71,10 @@ boolean isValuesChanged();
 
 boolean isTimeOut(unsigned long &time, const unsigned int &timeOut, boolean reset);
 
-void sendJson(Stream &serialPort) {
+void sendJson(Stream &serialPort, JsonDocument &json) {
   digitalWrite(LED_BUILTIN, LOW);
   String jsonString;
-  serializeJson(doc, jsonString);
+  serializeJson(json, jsonString);
   serialPort.println(jsonString);
   digitalWrite(LED_BUILTIN, HIGH);
 }
@@ -134,19 +134,33 @@ void readSerial(Stream &serialPort) {
       distance = 0;
       count = 0;
     } else if (line.equalsIgnoreCase("get")) {
-      sendJson(serialPort);
+      sendJson(serialPort, doc);
+    }if (line.equalsIgnoreCase("getConfig")) {
+      JsonDocument cf;
+      cf["encoder"] = ENCODER_SCALE;
+      cf["nt_time"] = NT_DELAY_TIME;
+      cf["np_time"] = NP_DELAY_TIME;
+      cf["rpm"] = RPM_SCALE;
+      sendJson(serialPort, cf);
     } else if (line.charAt(0) == '{' && line.charAt(line.length() - 1) == '}') {
       JsonDocument filter;
       filter["encoder"] = true;
       filter["nt_time"] = true;
       filter["np_time"] = true;
+      filter["rpm"] = true;
       JsonDocument config;
       deserializeJson(config, line, DeserializationOption::Filter(filter));
       updateConfig<double>(config, ENCODER_SCALE, "encoder", 1);
       updateConfig<double>(config, RPM_SCALE, "rpm", 1);
       updateConfig<uint>(config, NT_DELAY_TIME, "nt_time", 0);
       updateConfig<uint>(config, NP_DELAY_TIME, "np_time", 0);
-      sendJson(serialPort);
+      JsonDocument cf;
+      cf["encoder"] = ENCODER_SCALE;
+      cf["nt_time"] = NT_DELAY_TIME;
+      cf["np_time"] = NP_DELAY_TIME;
+      cf["rpm"] = RPM_SCALE;
+      sendJson(serialPort, cf);
+      sendJson(serialPort, doc);
     }
   }
 }
@@ -362,8 +376,8 @@ void loop() {
     // rpmV =
   }
   if (isValuesChanged() || isTimeOut(checkSendTime, 500)) {
-    sendJson(Serial);
-    sendJson(Serial1);
+    sendJson(Serial, doc);
+    sendJson(Serial1, doc);
     distance = 0;
     checkSendTime = millis();
   }
