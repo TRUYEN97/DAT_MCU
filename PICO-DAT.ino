@@ -1,53 +1,48 @@
 #include <TinyGPS.h>
 #include <ArduinoJson.h>
+#include "MyEeprom.h"
+#include "MyEncoder.h"
 
-double ENCODER_SCALE = 10.5;
-double RPM_SCALE = 60;
+
+float RPM_SCALE = 60;
 unsigned int NT_DELAY_TIME = 666;
 unsigned int NP_DELAY_TIME = 666;
 
-int8_t const FORWARD = 1;
-int8_t const BACKWARD = -1;
-int8_t const STOP = 0;
-uint8_t const PIN_RPM = 2;
-uint8_t const PIN_PHASE_B = 3;
-uint8_t const PIN_PHASE_A = 22;
-uint8_t const GPS_TX = 4;
-uint8_t const GPS_RX = 5;
-uint8_t const S1_PIN = 6;
-uint8_t const S2_PIN = 7;
-uint8_t const S3_PIN = 8;
-uint8_t const S4_PIN = 9;
-uint8_t const T1_PIN = 10;
-uint8_t const T2_PIN = 11;
-uint8_t const T3_PIN = 12;
-uint8_t const RELAY_1 = 13;
-uint8_t const RELAY_2 = 14;
-uint8_t const RELAY_3 = 15;
-uint8_t const CM_PIN = 16;
-uint8_t const PT_PIN = 17;
-uint8_t const NT_PIN = 18;
-uint8_t const NP_PIN = 19;
-uint8_t const AT_PIN = 20;
-uint8_t const ADC_RPM_PIN = 26;
-uint8_t const ADC_TEMP_PIN = 27;
-uint8_t const ADC_VIN_PIN = 28;
 
-long count = 0;
-double distance = 0;
-double speed = 0;
+uint8_t const T3_PIN = 2;
+uint8_t const T2_PIN = 3;
+uint8_t const GPS_RX = 4;
+uint8_t const GPS_TX = 5;
+uint8_t const T1_PIN = 6;
+uint8_t const PT_PIN = 8;
+uint8_t const NT_PIN = 9;
+uint8_t const CM_PIN = 10;
+uint8_t const ADC_VIN_PIN = 11;
+uint8_t const S1_PIN = 12;
+uint8_t const S2_PIN = 13;
+uint8_t const S3_PIN = 14;
+uint8_t const S4_PIN = 15;
+uint8_t const RELAY_3 = 18;
+uint8_t const RELAY_2 = 19;
+uint8_t const RELAY_1 = 20;
+uint8_t const NP_PIN = 21;
+uint8_t const AT_PIN = 22;
+uint8_t const ADC_TEMP_PIN = 26;
+uint8_t const ADC_RPM_PIN = 27;
+uint8_t const PIN_RPM = 28;
+
 double temp = 0;
 double latitude = 0;
 double longitude = 0;
 double rpm = 0;
 unsigned int rpmV = 0;
-int8_t status = 0;
 
 JsonDocument doc;
 TinyGPS gps;
+MyEncoder encoder(16, 17);
+MyEeprom myEeprom;
 
-#define PHASE_A digitalRead(PIN_PHASE_A)
-#define PHASE_B digitalRead(PIN_PHASE_B)
+
 #define ADC_RPM analogRead(ADC_RPM_PIN)
 #define ADC_TEMP analogRead(ADC_TEMP_PIN)
 #define ADC_VIN analogRead(ADC_VIN_PIN)
@@ -57,16 +52,16 @@ void sendJson(Stream &serialPort, JsonDocument &json);
 template<typename T = uint>
 void updateConfig(const JsonDocument &config, T &field, const char *key, T spec);
 
-void readSerial();
+void readSerial(Stream &serialPort);
 
 boolean valueOf(uint8_t const &pin, boolean status);
 
-boolean valOfNPT(boolean value, unsigned long &time, const unsigned int &timeOut, boolean status);
+boolean valOfNPT(boolean value, unsigned long &time, const unsigned int &timeOut);
 
 template<typename T = boolean>
 boolean hasUpdate(const char *key, T value);
 
-boolean isValuesChanged();
+boolean isValuesChanged(boolean changed = false);
 
 boolean isTimeOut(unsigned long &time, const unsigned int &timeOut, boolean reset);
 
@@ -130,14 +125,13 @@ void readSerial(Stream &serialPort) {
     } else if (line.equalsIgnoreCase("r3")) {
       digitalWrite(RELAY_3, 1);
     } else if (line.equalsIgnoreCase("reset")) {
-      distance = 0;
-      count = 0;
+      encoder.reset();
     } else if (line.equalsIgnoreCase("get")) {
       sendJson(serialPort, doc);
     }
     if (line.equalsIgnoreCase("getConfig")) {
       JsonDocument cf;
-      cf["encoder"] = ENCODER_SCALE;
+      cf["encoder"] = encoder.getScale();
       cf["nt_time"] = NT_DELAY_TIME;
       cf["np_time"] = NP_DELAY_TIME;
       cf["rpm"] = RPM_SCALE;
@@ -150,12 +144,15 @@ void readSerial(Stream &serialPort) {
       filter["rpm"] = true;
       JsonDocument config;
       deserializeJson(config, line, DeserializationOption::Filter(filter));
-      updateConfig<double>(config, ENCODER_SCALE, "encoder", 1);
-      updateConfig<double>(config, RPM_SCALE, "rpm", 1);
-      updateConfig<uint>(config, NT_DELAY_TIME, "nt_time", 0);
-      updateConfig<uint>(config, NP_DELAY_TIME, "np_time", 0);
+      float encoderScale = encoder.getScale();
+      updateConfig<float>(config, encoderScale, "encoder", 1);
+      encoder.setScale(encoderScale);
+      updateConfig<float>(config, RPM_SCALE, "rpm", 1);
+      updateConfig<unsigned int>(config, NT_DELAY_TIME, "nt_time", 0);
+      updateConfig<unsigned int>(config, NP_DELAY_TIME, "np_time", 0);
+      myEeprom.saveConfig(encoder.getScale(), RPM_SCALE, NT_DELAY_TIME, NP_DELAY_TIME);
       JsonDocument cf;
-      cf["encoder"] = ENCODER_SCALE;
+      cf["encoder"] = encoder.getScale();
       cf["nt_time"] = NT_DELAY_TIME;
       cf["np_time"] = NP_DELAY_TIME;
       cf["rpm"] = RPM_SCALE;
@@ -201,33 +198,21 @@ void setup() {
   pinMode(S2_PIN, INPUT_PULLUP);
   pinMode(S3_PIN, INPUT_PULLUP);
   pinMode(S4_PIN, INPUT_PULLUP);
-  pinMode(PIN_PHASE_A, INPUT_PULLUP);
-  pinMode(PIN_PHASE_B, INPUT_PULLUP);
   pinMode(PIN_RPM, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(PIN_PHASE_A), attachPhaseA, RISING);
-  attachInterrupt(digitalPinToInterrupt(PIN_PHASE_B), attachPhaseB, RISING);
   attachInterrupt(digitalPinToInterrupt(PIN_RPM), attachRPM, RISING);
-  pinMode(PIN_PHASE_A, INPUT_PULLUP);
-  pinMode(PIN_PHASE_B, INPUT_PULLUP);
   pinMode(PIN_RPM, INPUT_PULLUP);
   Serial1.begin(115200);
-  Serial2.setTX(GPS_TX);
-  Serial2.setRX(GPS_RX);
+  Serial2.setTX(GPS_RX);
+  Serial2.setRX(GPS_TX);
   Serial2.begin(9600);
   Serial.begin(115200);
+
+  encoder.init(500);
+  myEeprom.init();
+  float encoderScale = encoder.getScale();
+  myEeprom.readConfig(encoderScale, RPM_SCALE, NT_DELAY_TIME, NP_DELAY_TIME);
+  encoder.setScale(encoderScale);
   isValuesChanged();
-}
-
-void attachPhaseA() {
-  if (PHASE_B) {
-    count += 1;
-  }
-}
-
-void attachPhaseB() {
-  if (PHASE_A) {
-    count -= 1;
-  }
 }
 
 unsigned int rpmCount = 0;
@@ -237,10 +222,10 @@ void attachRPM() {
 
 boolean valueOf(uint8_t const &pin, boolean status = false) {
   if (digitalRead(pin) == status) {
-    delay(20);
-    if (digitalRead(pin) == status) {
-      return true;
-    }
+    // delay(20);
+    // if (digitalRead(pin) == status) {
+    return true;
+    // }
   }
   return false;
 }
@@ -267,8 +252,7 @@ boolean hasUpdate(const char *key, T value) {
   return false;
 }
 
-boolean isValuesChanged() {
-  boolean changed = false;
+boolean isValuesChanged(boolean changed) {
   if (hasUpdate("cm", CM)) {
     changed = true;
   }
@@ -305,15 +289,6 @@ boolean isValuesChanged() {
   if (hasUpdate("s4", S4)) {
     changed = true;
   }
-  if (hasUpdate("status", status)) {
-    changed = true;
-  }
-  if (hasUpdate("distance", distance)) {
-    changed = true;
-  }
-  if (hasUpdate("speed", speed)) {
-    changed = true;
-  }
   if (hasUpdate("rpm", rpm)) {
     changed = true;
   }
@@ -346,22 +321,19 @@ boolean isTimeOut(unsigned long &time, const unsigned int &timeOut, boolean rese
   return rs;
 }
 
-unsigned long checkDistanceTime = millis();
 unsigned long checkRPMTime = millis();
 unsigned long checkSendTime = millis();
 void loop() {
-  if (isTimeOut(checkDistanceTime, 500)) {
-    long x = count;
-    count = 0;
-    distance = x / ENCODER_SCALE;
-    speed = abs(x) * 7.2 / ENCODER_SCALE;  //
-    if (x == 0) {
-      distance = 0;
-      status = STOP;
-    } else if (x > 0) {
-      status = FORWARD;
-    } else {
-      status = BACKWARD;
+  boolean changed = false;
+  if (encoder.isTime()) {
+    if (hasUpdate("status", encoder.getStatus())) {
+      changed = true;
+    }
+    if (hasUpdate("distance", encoder.getDistance())) {
+      changed = true;
+    }
+    if (hasUpdate("speed", encoder.getSpeed())) {
+      changed = true;
     }
   }
   if (isTimeOut(checkRPMTime, 500)) {
@@ -371,10 +343,9 @@ void loop() {
     // temp = ADC_TEMP * 0.08;
     // rpmV =
   }
-  if (isValuesChanged() || isTimeOut(checkSendTime, 500)) {
+  if (isValuesChanged(changed) || isTimeOut(checkSendTime, 500)) {
     sendJson(Serial, doc);
     sendJson(Serial1, doc);
-    distance = 0;
     checkSendTime = millis();
   }
   readSerial(Serial);
