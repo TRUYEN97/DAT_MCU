@@ -1,9 +1,10 @@
+#include "SerialUSB.h"
 #include "MyEncoder.h"
 
 MyEncoder::MyEncoder(int8_t pinA, int8_t pinB)
-  : pinA(pinA), pinB(pinB), scale(10.5), distance(0), speed(0), status(0), time(0), count(0), oldTimeMs(0), hasGetDistance(true) {}
+  : pinA(pinA), pinB(pinB), scale(10.5), time(0), count(0), oldTimeMs(0){}
 
-
+const String MyEncoder::ENCODE_KEY = "encoder";
 
 void attachPhaseA(MyEncoder *encoder) {
   encoder->attachPhaseACallback();
@@ -25,7 +26,6 @@ void MyEncoder::init(unsigned int time) {
 }
 
 void MyEncoder::reset() {
-  this->distance = 0;
   this->count = 0;
   this->oldTimeMs = millis();
 }
@@ -50,49 +50,73 @@ float MyEncoder::getScale() {
   return this->scale;
 }
 
-bool MyEncoder::isTime() {
+bool MyEncoder::getData(double &distance, float &speed, uint8_t &status) {
   unsigned long delta = millis() - this->oldTimeMs;
-
   if (delta >= this->time) {
-    unsigned long countTemp;
-    noInterrupts(); 
-    countTemp = this->count;
+    ///////////////////////////
+    noInterrupts();
+    unsigned long countTemp = this->count;
     this->count = 0;
     interrupts();
     this->oldTimeMs = millis();
-    this->distance = countTemp / this->scale;
+    ////////////////////////////////////
+    ////////////////////////////////////
     if (countTemp == 0) {
-      this->distance = 0;
-      this->status = STOP;
-      this->speed = 0;
+      distance = 0;
+      status = STOP;
+      speed = 0;
     } else {
-      if (delta == 0) delta = 1; 
+      if (delta == 0) {
+        delta = 1;
+      }
+      distance = countTemp / this->scale;
+      double m_s = distance * 1000.0 / delta;
       if (countTemp > 0) {
-        this->status = FORWARD;
-        this->speed = countTemp * 3.6 / this->scale / delta / 1000.0;
+        status = FORWARD;
+        speed = m_s * 3.6;
       } else {
-        this->status = BACKWARD;
-        this->speed = countTemp * -3.6 / this->scale / delta / 1000.0;
+        status = BACKWARD;
+        speed = m_s * -3.6;
       }
     }
-    this->hasGetDistance = false;
     return true;
-  } else if (this->hasGetDistance) {
-    this->distance = 0;
   }
-
   return false;
 }
 
-float MyEncoder::getDistance() {
-  this->hasGetDistance = true;
-  return this->distance;
+bool MyEncoder::update(JsonDocument &data, const char *key, bool value) {
+  if (data[key].as<bool>() != value) {
+    data[key] = value;
+    return true;
+  }
+  return false;
 }
 
-float MyEncoder::getSpeed() {
-  return this->speed;
+bool MyEncoder::getData(JsonDocument &data) {
+  bool changed = false;
+  double distance;
+  float speed;
+  uint8_t status;
+  if (getData(distance, speed, status)) {
+    if (update(data, "distance", distance)) {
+      changed = true;
+    }
+    if (update(data, "speed", speed)) {
+      changed = true;
+    }
+    if (update(data, "status", status)) {
+      changed = true;
+    }
+  }
+  return changed;
 }
 
-int8_t MyEncoder::getStatus() {
-  return this->status;
+void MyEncoder::getConfig(JsonDocument &config) {
+  config[ENCODE_KEY] = this->scale;
+}
+
+void MyEncoder::setConfig(const JsonDocument &config) {
+  if (config[ENCODE_KEY].is<float>()) {
+    setScale(config[ENCODE_KEY].as<float>());
+  }
 }

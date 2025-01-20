@@ -1,7 +1,7 @@
 #ifndef _MY_EEPROM_H_
 #define _MY_EEPROM_H_
 #include <EEPROM.h>
-
+#include <ArduinoJson.h>
 
 class MyEeprom {
   template<typename T = int>
