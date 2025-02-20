@@ -13,9 +13,9 @@ void Sensor::init() {
   this->cm.setInputMode(INPUT_PULLUP);
   this->nt.setHoldTime(666);
   this->np.setHoldTime(666);
-  this->t1.setHoldTime(200);
-  this->t2.setHoldTime(200);
-  this->t3.setHoldTime(200);
+  this->t1.setHoldTime(500);
+  this->t2.setHoldTime(500);
+  this->t3.setHoldTime(500);
 }
 
 bool Sensor::update(JsonDocument &data, const char *key, boolean value) {

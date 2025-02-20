@@ -9,14 +9,17 @@ class MyEncoder {
   int8_t pinB;
   float scale;
   unsigned int time;
-  unsigned long count;
+  long count;
   unsigned long oldTimeMs;
-  bool update(JsonDocument &data, const char *key, boolean value);
+  template <typename T = bool>
+  bool update(JsonDocument &data, const char *key, T value);
 public:
   static const String ENCODE_KEY;
   static int8_t const FORWARD = 1;
   static int8_t const BACKWARD = -1;
   static int8_t const STOP = 0;
+  static void attachPhaseA(MyEncoder *encoder);
+  static void attachPhaseB(MyEncoder *encoder);
   MyEncoder(int8_t pinA, int8_t pinB);
   void attachPhaseACallback();
   void attachPhaseBCallback();

@@ -3,18 +3,18 @@
 #include <ArduinoJson.h>
 #include "DigitalIO.h"
 
-#define T3_PIN 2
-#define T2_PIN 3
-#define T1_PIN 6
-#define PT_PIN 8
-#define AT_PIN 9
-#define CM_PIN 10
-#define S1_PIN 12
-#define S2_PIN 13
+#define NP_PIN 3
+#define PT_PIN 4
+#define NT_PIN 5
+#define AT_PIN 6
+#define CM_PIN 7
+#define T3_PIN 8
+#define S1_PIN 10
+#define T2_PIN 11
+#define S2_PIN 12
+#define T1_PIN 13
 #define S3_PIN 14
 #define S4_PIN 15
-#define NP_PIN 21
-#define NT_PIN 22
 class Sensor {
   DIO pt;
   DIO at;

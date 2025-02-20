@@ -1,26 +1,23 @@
-#include "SerialUSB.h"
 #include "MyEncoder.h"
 
 MyEncoder::MyEncoder(int8_t pinA, int8_t pinB)
-  : pinA(pinA), pinB(pinB), scale(10.5), time(0), count(0), oldTimeMs(0){}
+  : pinA(pinA), pinB(pinB), scale(50), time(200), count(0), oldTimeMs(0) {}
 
 const String MyEncoder::ENCODE_KEY = "encoder";
 
-void attachPhaseA(MyEncoder *encoder) {
+void MyEncoder::attachPhaseA(MyEncoder *encoder) {
   encoder->attachPhaseACallback();
 }
 
-void attachPhaseB(MyEncoder *encoder) {
+void MyEncoder::attachPhaseB(MyEncoder *encoder) {
   encoder->attachPhaseBCallback();
 }
 
 void MyEncoder::init(unsigned int time) {
   pinMode(this->pinA, INPUT_PULLUP);
   pinMode(this->pinB, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(this->pinA), attachPhaseA, RISING, this);
-  attachInterrupt(digitalPinToInterrupt(this->pinB), attachPhaseB, RISING, this);
-  pinMode(this->pinA, INPUT_PULLUP);
-  pinMode(this->pinB, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(this->pinA), MyEncoder::attachPhaseA, RISING, this);
+  attachInterrupt(digitalPinToInterrupt(this->pinB), MyEncoder::attachPhaseB, RISING, this);
   oldTimeMs = millis();
   this->time = time;
 }
@@ -54,11 +51,10 @@ bool MyEncoder::getData(double &distance, float &speed, uint8_t &status) {
   unsigned long delta = millis() - this->oldTimeMs;
   if (delta >= this->time) {
     ///////////////////////////
-    noInterrupts();
-    unsigned long countTemp = this->count;
+    long countTemp = this->count;
     this->count = 0;
-    interrupts();
     this->oldTimeMs = millis();
+    // Serial.println(countTemp);
     ////////////////////////////////////
     ////////////////////////////////////
     if (countTemp == 0) {
@@ -70,7 +66,7 @@ bool MyEncoder::getData(double &distance, float &speed, uint8_t &status) {
         delta = 1;
       }
       distance = countTemp / this->scale;
-      double m_s = distance * 1000.0 / delta;
+      double m_s = distance * (1000.0 / delta);
       if (countTemp > 0) {
         status = FORWARD;
         speed = m_s * 3.6;
@@ -83,9 +79,9 @@ bool MyEncoder::getData(double &distance, float &speed, uint8_t &status) {
   }
   return false;
 }
-
-bool MyEncoder::update(JsonDocument &data, const char *key, bool value) {
-  if (data[key].as<bool>() != value) {
+template<typename T>
+bool MyEncoder::update(JsonDocument &data, const char *key, T value) {
+  if (data[key].as<T>() != value) {
     data[key] = value;
     return true;
   }
@@ -98,13 +94,13 @@ bool MyEncoder::getData(JsonDocument &data) {
   float speed;
   uint8_t status;
   if (getData(distance, speed, status)) {
-    if (update(data, "distance", distance)) {
+    if (update<double>(data, "distance", distance)) {
       changed = true;
     }
-    if (update(data, "speed", speed)) {
+    if (update<float>(data, "speed", speed)) {
       changed = true;
     }
-    if (update(data, "status", status)) {
+    if (update<uint8_t>(data, "status", status)) {
       changed = true;
     }
   }
