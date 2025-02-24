@@ -27,7 +27,7 @@ public:
   void reset();
   void setScale(float scale);
   float getScale();
-  bool getData(double &distance, float &speed, uint8_t &status);
+  bool getData(double &distance, float &speed, int8_t &status);
   bool getData(JsonDocument &data);
   void getConfig(JsonDocument &config);
   void setConfig(const JsonDocument &config);

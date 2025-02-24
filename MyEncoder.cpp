@@ -47,13 +47,16 @@ float MyEncoder::getScale() {
   return this->scale;
 }
 
-bool MyEncoder::getData(double &distance, float &speed, uint8_t &status) {
+bool MyEncoder::getData(double &distance, float &speed, int8_t &status) {
   unsigned long delta = millis() - this->oldTimeMs;
   if (delta >= this->time) {
     ///////////////////////////
     long countTemp = this->count;
     this->count = 0;
     this->oldTimeMs = millis();
+    // distance = countTemp;
+    // speed = 0;
+    // status = STOP;
     // Serial.println(countTemp);
     ////////////////////////////////////
     ////////////////////////////////////
@@ -90,17 +93,18 @@ bool MyEncoder::update(JsonDocument &data, const char *key, T value) {
 
 bool MyEncoder::getData(JsonDocument &data) {
   bool changed = false;
-  double distance;
-  float speed;
-  uint8_t status;
+  double distance = 0;
+  float speed = 0;
+  int8_t status = STOP;
   if (getData(distance, speed, status)) {
+    // distance += data["distance"].as<double>();
     if (update<double>(data, "distance", distance)) {
       changed = true;
     }
     if (update<float>(data, "speed", speed)) {
       changed = true;
     }
-    if (update<uint8_t>(data, "status", status)) {
+    if (update<int8_t>(data, "status", status)) {
       changed = true;
     }
   }
