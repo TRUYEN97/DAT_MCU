@@ -11,11 +11,12 @@ Sensor::Sensor()
 
 void Sensor::init() {
   this->cm.setInputMode(INPUT_PULLUP);
+  this->cm.setHoldTime(1000);
   this->nt.setHoldTime(666);
   this->np.setHoldTime(666);
-  this->t1.setHoldTime(500);
-  this->t2.setHoldTime(500);
-  this->t3.setHoldTime(500);
+  // this->t1.setHoldTime(100);
+  // this->t2.setHoldTime(100);
+  // this->t3.setHoldTime(100);
 }
 
 bool Sensor::update(JsonDocument &data, const char *key, boolean value) {
@@ -60,13 +61,13 @@ bool Sensor::hasUpdate(JsonDocument &data) {
   if (update(data, "pt", this->pt.getValue(0, target))) {
     changed = true;
   }
-  if (update(data, "t1", this->t1.getValue(0, target))) {
+  if (update(data, "t1", this->t1.getValue(30, target))) {
     changed = true;
   }
-  if (update(data, "t2", this->t2.getValue(0, target))) {
+  if (update(data, "t2", this->t2.getValue(30, target))) {
     changed = true;
   }
-  if (update(data, "t3", this->t3.getValue(0, target))) {
+  if (update(data, "t3", this->t3.getValue(30, target))) {
     changed = true;
   }
   if (update(data, "s1", this->s1.getValue(0, target))) {

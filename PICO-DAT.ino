@@ -47,15 +47,14 @@ void setup() {
 unsigned long checkSendTime = millis();
 void loop() {
   boolean changed = false;
-  if (encoder.getData(doc)) {
+  if (encoder.check() && encoder.getData(doc)) {
     changed = true;
   }
   if (sensor.hasUpdate(doc)) {
     changed = true;
   }
-  if (changed || millis() - checkSendTime >= 500) {
+  if (changed || millis() - checkSendTime >= 1000) {
     sendJson(Serial, doc);
-    checkSendTime = millis();
   }
   readSerial(Serial);
 }
@@ -67,6 +66,7 @@ void sendJson(Stream &serialPort, JsonDocument &json) {
   serializeJson(json, jsonString);
   serialPort.println(jsonString);
   digitalWrite(LED_BUILTIN, HIGH);
+  checkSendTime = millis();
 }
 
 void sendConfig(Stream &serialPort) {

@@ -1,7 +1,8 @@
+#include "lwipopts.h"
 #include "MyEncoder.h"
 
 MyEncoder::MyEncoder(int8_t pinA, int8_t pinB)
-  : pinA(pinA), pinB(pinB), scale(50), time(200), count(0), oldTimeMs(0) {}
+  : pinA(pinA), pinB(pinB), scale(50), time(200), count(0), oldTimeMs(0), distance(0), speed(0), status(STOP) {}
 
 const String MyEncoder::ENCODE_KEY = "encoder";
 
@@ -18,12 +19,15 @@ void MyEncoder::init(unsigned int time) {
   pinMode(this->pinB, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(this->pinA), MyEncoder::attachPhaseA, RISING, this);
   attachInterrupt(digitalPinToInterrupt(this->pinB), MyEncoder::attachPhaseB, RISING, this);
+  pinMode(this->pinA, INPUT_PULLUP);
+  pinMode(this->pinB, INPUT_PULLUP);
   oldTimeMs = millis();
   this->time = time;
 }
 
 void MyEncoder::reset() {
   this->count = 0;
+  this->distance = 0;
   this->oldTimeMs = millis();
 }
 
@@ -46,42 +50,50 @@ void MyEncoder::setScale(float scale) {
 float MyEncoder::getScale() {
   return this->scale;
 }
-
-bool MyEncoder::getData(double &distance, float &speed, int8_t &status) {
+bool MyEncoder::check() {
   unsigned long delta = millis() - this->oldTimeMs;
   if (delta >= this->time) {
     ///////////////////////////
+    // noInterrupts();
     long countTemp = this->count;
     this->count = 0;
     this->oldTimeMs = millis();
-    // distance = countTemp;
-    // speed = 0;
-    // status = STOP;
+    // interrupts();
+    // this->distance += countTemp;
+    // this->speed = 0;
+    // this->status = STOP;
     // Serial.println(countTemp);
     ////////////////////////////////////
     ////////////////////////////////////
     if (countTemp == 0) {
-      distance = 0;
-      status = STOP;
-      speed = 0;
+      this->status = STOP;
+      this->speed = 0;
     } else {
       if (delta == 0) {
         delta = 1;
       }
-      distance = countTemp / this->scale;
-      double m_s = distance * (1000.0 / delta);
+      double currentDistance =  countTemp / this->scale;
+      this->distance += currentDistance;
+      double m_s = currentDistance * (1000.0 / delta);
       if (countTemp > 0) {
-        status = FORWARD;
-        speed = m_s * 3.6;
+        this->status = FORWARD;
+        this->speed = m_s * 3.6;
       } else {
-        status = BACKWARD;
-        speed = m_s * -3.6;
+        this->status = BACKWARD;
+        this->speed = m_s * -3.6;
       }
     }
     return true;
   }
   return false;
 }
+
+void MyEncoder::getData(double &distance, float &speed, int8_t &status) {
+  distance = this->distance;
+  speed = this->speed;
+  status = this->status;
+}
+
 template<typename T>
 bool MyEncoder::update(JsonDocument &data, const char *key, T value) {
   if (data[key].as<T>() != value) {
@@ -93,20 +105,14 @@ bool MyEncoder::update(JsonDocument &data, const char *key, T value) {
 
 bool MyEncoder::getData(JsonDocument &data) {
   bool changed = false;
-  double distance = 0;
-  float speed = 0;
-  int8_t status = STOP;
-  if (getData(distance, speed, status)) {
-    // distance += data["distance"].as<double>();
-    if (update<double>(data, "distance", distance)) {
-      changed = true;
-    }
-    if (update<float>(data, "speed", speed)) {
-      changed = true;
-    }
-    if (update<int8_t>(data, "status", status)) {
-      changed = true;
-    }
+  if (update<double>(data, "distance", this->distance)) {
+    changed = true;
+  }
+  if (update<float>(data, "speed", this->speed)) {
+    changed = true;
+  }
+  if (update<int8_t>(data, "status", this->status)) {
+    changed = true;
   }
   return changed;
 }

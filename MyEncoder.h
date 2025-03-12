@@ -10,6 +10,9 @@ class MyEncoder {
   float scale;
   unsigned int time;
   long count;
+  double distance;
+  float speed;
+  int8_t status;
   unsigned long oldTimeMs;
   template <typename T = bool>
   bool update(JsonDocument &data, const char *key, T value);
@@ -27,7 +30,8 @@ public:
   void reset();
   void setScale(float scale);
   float getScale();
-  bool getData(double &distance, float &speed, int8_t &status);
+  bool check();
+  void getData(double &distance, float &speed, int8_t &status);
   bool getData(JsonDocument &data);
   void getConfig(JsonDocument &config);
   void setConfig(const JsonDocument &config);
