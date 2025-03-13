@@ -15,9 +15,10 @@ class MyEncoder {
   int8_t status;
   unsigned long oldTimeMs;
   template <typename T = bool>
-  bool update(JsonDocument &data, const char *key, T value);
+  bool update(JsonDocument &data, String key, T value);
 public:
   static const String ENCODE_KEY;
+  static const String DISTANCE_KEY;
   static int8_t const FORWARD = 1;
   static int8_t const BACKWARD = -1;
   static int8_t const STOP = 0;

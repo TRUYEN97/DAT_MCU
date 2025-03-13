@@ -5,6 +5,7 @@ MyEncoder::MyEncoder(int8_t pinA, int8_t pinB)
   : pinA(pinA), pinB(pinB), scale(50), time(200), count(0), oldTimeMs(0), distance(0), speed(0), status(STOP) {}
 
 const String MyEncoder::ENCODE_KEY = "encoder";
+const String MyEncoder::DISTANCE_KEY = "distance";
 
 void MyEncoder::attachPhaseA(MyEncoder *encoder) {
   encoder->attachPhaseACallback();
@@ -95,7 +96,7 @@ void MyEncoder::getData(double &distance, float &speed, int8_t &status) {
 }
 
 template<typename T>
-bool MyEncoder::update(JsonDocument &data, const char *key, T value) {
+bool MyEncoder::update(JsonDocument &data, String key, T value) {
   if (data[key].as<T>() != value) {
     data[key] = value;
     return true;
@@ -105,7 +106,7 @@ bool MyEncoder::update(JsonDocument &data, const char *key, T value) {
 
 bool MyEncoder::getData(JsonDocument &data) {
   bool changed = false;
-  if (update<double>(data, "distance", this->distance)) {
+  if (update<double>(data, DISTANCE_KEY, this->distance)) {
     changed = true;
   }
   if (update<float>(data, "speed", this->speed)) {
@@ -124,5 +125,8 @@ void MyEncoder::getConfig(JsonDocument &config) {
 void MyEncoder::setConfig(const JsonDocument &config) {
   if (config[ENCODE_KEY].is<float>()) {
     setScale(config[ENCODE_KEY].as<float>());
+  }
+  if(config[DISTANCE_KEY].is<double>()){
+    this->distance = config[DISTANCE_KEY].as<double>();
   }
 }

@@ -9,6 +9,8 @@ uint8_t const RELAY_3 = 18;
 uint8_t const RELAY_2 = 19;
 uint8_t const RELAY_1 = 20;
 
+const char* FIRST_TIME_KEY = "firstTime";
+
 JsonDocument doc;
 MyEncoder encoder(17, 16);
 Rpm rpm(28);
@@ -42,6 +44,7 @@ void setup() {
     doc["yardUser"] = myEeprom.getUser();
   }
   readConfigFromEEPROM();
+  doc[FIRST_TIME_KEY] = true;
 }
 
 unsigned long checkSendTime = millis();
@@ -107,8 +110,10 @@ void readSerial(Stream &serialPort) {
     if (line.equalsIgnoreCase("getConfig")) {
       sendConfig(serialPort);
     } else if (line.charAt(0) == '{' && line.charAt(line.length() - 1) == '}') {
+      doc[FIRST_TIME_KEY] = false; // reset cap nhat khoang cach tu app
       JsonDocument filter;
       filter[MyEncoder::ENCODE_KEY] = true;
+      filter[MyEncoder::DISTANCE_KEY] = true; // {"distance":200}
       filter[Sensor::NT_DELAY_TIME] = true;
       filter[Sensor::NP_DELAY_TIME] = true;
       filter[Rpm::RPM_KEY] = true;
